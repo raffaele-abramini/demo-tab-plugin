@@ -1,0 +1,13 @@
+[
+  {
+    "name": "DemoPlugin",
+    "version": "0.0.0",
+    "class": "DemoPlugin",
+    "requires": [
+      {
+        "@twilio/flex-ui": "^1"
+      }
+    ],
+    "src": "http://127.0.0.1:8085"
+  }
+]
