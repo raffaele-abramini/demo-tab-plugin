@@ -23,6 +23,6 @@ export default class DemoPlugin extends FlexPlugin {
     flex.TaskCanvasTabs.Content.add(<Tab uniqueName="customTabOne" key="key-to-my-tab"><MyNewTabComponent/></Tab>);
     flex.TaskCanvasTabs.Content.add(<Tab uniqueName="customTabTwo" key="key-to-my-other-tab"><MyNewOtherTabComponent/></Tab>);
 
-    stuff.bootstrap(manager)
+    stuff.bootstrap(flex, manager)
   }
 }

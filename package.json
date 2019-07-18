@@ -21,6 +21,7 @@
     "flex-plugin": "^2",
     "react": "16.5.2",
     "react-dom": "16.5.2",
+    "react-redux": "^7.1.0",
     "react-scripts": "^3.0.0",
     "react-test-renderer": "^16.8.6",
     "twilio-sync": "^0.11.2",
