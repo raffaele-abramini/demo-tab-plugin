@@ -9,49 +9,19 @@ const deviceTokenKEy = 'devideToke'
 
 export const stuff = {
   async bootstrap(flex, manager) {
-    this.state = manager.store.getState().flex
-    manager.store.addReducer('devices', reducer)
+    this.manager = manager;
+    this.setupRedux();
     flex.MainHeader.Content.add(<ConnectedDeviceCounter key="devices"/>)
 
-    this.token = this.state.session.ssoTokenPayload.token
-    this.client = new SyncClient(this.token)
-    this.devicesMap = await this.client.map(`devices_${this.state.worker.worker.sid}`)
-
-    const items = await this.devicesMap.getItems()
-    const thing = items.items.map(extractID)
-
-    manager.store.dispatch({
-      type: ADD_DEVICES,
-      payload: Object.keys(thing).map(key => thing[key]),
-    })
-
-    this.devicesMap.on('itemAdded', (item) => {
-      manager.store.dispatch({
-        type: UPDATE_DEVICE,
-        payload: item.item.descriptor.key,
-      })
-    })
-    this.devicesMap.on('itemUpdated', (item) => {
-      manager.store.dispatch({
-        type: UPDATE_DEVICE,
-        payload: item.item.descriptor.key,
-      })
-    })
-    this.devicesMap.on('itemRemoved', (item) => {
-      manager.store.dispatch({
-        type: REMOVE_DEVICE,
-        payload: item.item.descriptor.key,
-      })
-    })
-    await this.devicesMap.set(this.getDeviceToken(), {})
+    await this.setupSync();
   },
 
   getDeviceToken() {
-    if (localStorage.getItem(`${deviceTokenKEy}__${this.token}`)) {
-      return localStorage.getItem(`${deviceTokenKEy}__${this.token}`)
+    if (localStorage.getItem(`${deviceTokenKEy}__${this.state.worker.worker.sid}`)) {
+      return localStorage.getItem(`${deviceTokenKEy}__${this.state.worker.worker.sid}`)
     } else {
       const t = uuidv4()
-      localStorage.setItem(`${deviceTokenKEy}__${this.token}`, t)
+      localStorage.setItem(`${deviceTokenKEy}__${this.state.worker.worker.sid}`, t)
       return t
     }
   },
@@ -59,6 +29,48 @@ export const stuff = {
   async clearMap() {
     await this.devicesMap.removeMap();
     window.location.reload();
+  },
+
+  setupRedux() {
+    this.manager.store.addReducer('devices', reducer)
+  },
+
+  async setupSync() {
+    this.state = this.manager.store.getState().flex;
+    this.token = this.state.session.ssoTokenPayload.token;
+
+    this.client = new SyncClient(this.token)
+    this.devicesMap = await this.client.map(`devices_${this.state.worker.worker.sid}`)
+
+    const items = await this.devicesMap.getItems()
+    const thing = items.items.map(extractID)
+
+    console.warn(items);
+
+    this.manager.store.dispatch({
+      type: ADD_DEVICES,
+      payload: Object.keys(thing).map(key => thing[key]),
+    })
+
+    this.devicesMap.on('itemAdded', (item) => {
+      this.manager.store.dispatch({
+        type: UPDATE_DEVICE,
+        payload: item.item.descriptor.key,
+      })
+    })
+    this.devicesMap.on('itemUpdated', (item) => {
+      this.manager.store.dispatch({
+        type: UPDATE_DEVICE,
+        payload: item.item.descriptor.key,
+      })
+    })
+    this.devicesMap.on('itemRemoved', (item) => {
+      this.manager.store.dispatch({
+        type: REMOVE_DEVICE,
+        payload: item.item.descriptor.key,
+      })
+    })
+    await this.devicesMap.set(this.getDeviceToken(), {})
   }
 }
 
