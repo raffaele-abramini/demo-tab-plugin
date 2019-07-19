@@ -148,8 +148,11 @@ const InnerBox = styled("div")`
 `
 const Title = styled("p")`
   font-weight: bold;
-  margin-bottom: 12px;
   margin-top: 0;
+  
+  &:not(:last-child) {
+    margin-bottom: 12px;
+  }
 `
 
 const DeviceRow = styled("div")`
@@ -164,8 +167,8 @@ const DeviceRowDetail = styled("div")`
   font-size: 11px;
 `
 
-const setBg  = (p) => {
-  const bg = p.theme.colors.notificationIconColorError;
+const setBg  = (p, det) => {
+  const bg = det.bg || p.theme.colors.notificationIconColorError;
   return `linear-gradient(${bg}, ${bg})`;
 }
 
@@ -178,6 +181,9 @@ const LogoutDeviceBtn = styled(IconButton)`
      width: 20px;
      height: 20px;
   }
+`
+const ToggleButton = styled(IconButton)`
+    background-image: ${p => p.isOpen ? setBg(p, { bg: p.theme.colors.base10 }) : ''};
 `
 
 
@@ -217,6 +223,7 @@ const PopupContent = ({ devices, refs }) => {
     </InnerBox>
   )
 };
+
 const DeviceCounter = ({ devices }) => {
   const refs = {};
 
@@ -224,15 +231,20 @@ const DeviceCounter = ({ devices }) => {
     refs.modal = element || refs.modal;
   };
 
+  const renderControl = (isOpen) => (
+    <ToggleButton
+      isOpen={isOpen}
+      icon={!devices || !Object.keys(devices).length ? "Agents" : "AgentsBold"}
+    />
+  )
+
   return (
     <OuterBox>
       <ModalPopupWithEntryControl
         className="DevicesList"
         alignRight
         autoClose
-        entryControl={
-          <IconButton icon={!devices || !Object.keys(devices).length ? "Agents" : "AgentsBold"} />
-        }
+        entryControl={renderControl}
         ref={setModalRef}
       >
       <PopupContent devices={devices} refs={refs} />
