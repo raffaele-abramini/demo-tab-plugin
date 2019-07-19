@@ -2,8 +2,9 @@ import { SyncClient } from 'twilio-sync'
 import uuidv4 from 'uuid/v4'
 import React from 'react'
 import { connect } from 'react-redux'
+import { ModalPopupWithEntryControl, IconButton, styled } from '@twilio/flex-ui';
+import UAParser from 'ua-parser-js';
 
-const getByID = (id) => (item) => item.key === id
 const extractID = (item) => item.descriptor.key
 const deviceTokenKEy = 'devideToke'
 
@@ -83,7 +84,11 @@ export const stuff = {
         payload: key,
       });
     })
-    await this.devicesMap.set(this.getCurrentDeviceToken(), {})
+
+    await this.devicesMap.set(this.getCurrentDeviceToken(), {
+      started: new Date().toLocaleString(),
+      details: UAParser(navigator)
+    })
   },
 
   logoutDevice(deviceKey) {
@@ -108,16 +113,49 @@ const reducer = (state, action) => {
   }
 }
 
+const OuterBox = styled("div")`
+  margin-left: auto;
+`
+const InnerBox = styled("div")`
+  background: ${p => p.theme.colors.base2};
+  width: 200px;
+  color: ${p => p.theme.calculated.textColor};
+  padding: 5px;
+  margin-top: 10px;
+  box-shadow: 0 1px 2px 0px rgba(0,0,0,0.2);
+  animation: opla 0.2s forwards;
+  @keyframes opla {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+`
+const Title = styled("p")`
+  font-weight: bold;
+  margin-bottom: 4px;
+  margin-top: 0;
+`
+
 
 const DeviceCounter = ({ devices }) => {
-  console.warn('devices', devices)
   return (
-    <div>
-      <button type="button" onClick={() => stuff.clearMap()}>clear</button>
-      {devices && !!devices.length && <>Devices {devices.map(dv => (
-        <button type="button" onClick={() => stuff.logoutDevice(dv)}>{dv} !!! </button>
-      ))}</>}
-    </div>
+    <OuterBox>
+      <ModalPopupWithEntryControl
+        className="DevicesList"
+        alignRight
+        entryControl={
+          <IconButton icon="info" />
+        }
+      >
+      <InnerBox>
+        {devices && !!devices.length && <>
+          <Title>Devices</Title>
+          {devices.map(dv => (
+            <button type="button" onClick={() => stuff.logoutDevice(dv)}>{dv} !!! </button>
+          ))}
+        </>}
+      </InnerBox>
+      </ModalPopupWithEntryControl>
+    </OuterBox>
   )
 }
 
