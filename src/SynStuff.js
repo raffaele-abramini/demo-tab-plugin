@@ -9,14 +9,16 @@ const deviceTokenKEy = 'devideToke'
 
 export const stuff = {
   async bootstrap(flex, manager) {
+    this.flex = flex;
     this.manager = manager;
     this.setupRedux();
     flex.MainHeader.Content.add(<ConnectedDeviceCounter key="devices"/>)
 
+    this.flex.Actions.addListener("beforeLogout", this.removeCurrentDeviceToken.bind(this))
     await this.setupSync();
   },
 
-  getDeviceToken() {
+  getCurrentDeviceToken() {
     if (localStorage.getItem(`${deviceTokenKEy}__${this.state.worker.worker.sid}`)) {
       return localStorage.getItem(`${deviceTokenKEy}__${this.state.worker.worker.sid}`)
     } else {
@@ -24,6 +26,10 @@ export const stuff = {
       localStorage.setItem(`${deviceTokenKEy}__${this.state.worker.worker.sid}`, t)
       return t
     }
+  },
+
+  removeCurrentDeviceToken() {
+    localStorage.removeItem(`${deviceTokenKEy}__${this.state.worker.worker.sid}`);
   },
 
   async clearMap() {
@@ -42,35 +48,46 @@ export const stuff = {
     this.client = new SyncClient(this.token)
     this.devicesMap = await this.client.map(`devices_${this.state.worker.worker.sid}`)
 
-    const items = await this.devicesMap.getItems()
-    const thing = items.items.map(extractID)
-
-    console.warn(items);
+    const devicesMapItems = await this.devicesMap.getItems()
+    const devicesIds = devicesMapItems.items.map(extractID)
 
     this.manager.store.dispatch({
       type: ADD_DEVICES,
-      payload: Object.keys(thing).map(key => thing[key]),
+      payload: Object.keys(devicesIds).map(key => devicesIds[key]),
     })
 
-    this.devicesMap.on('itemAdded', (item) => {
+    this.devicesMap.on('itemAdded', (deviceItem) => {
       this.manager.store.dispatch({
         type: UPDATE_DEVICE,
-        payload: item.item.descriptor.key,
+        payload: deviceItem.item.descriptor.key,
       })
     })
-    this.devicesMap.on('itemUpdated', (item) => {
+
+    this.devicesMap.on('itemUpdated', (deviceItem) => {
       this.manager.store.dispatch({
         type: UPDATE_DEVICE,
-        payload: item.item.descriptor.key,
-      })
+        payload: deviceItem.item.descriptor.key,
+      });
     })
-    this.devicesMap.on('itemRemoved', (item) => {
+
+    this.devicesMap.on('itemRemoved', ({ key }) => {
+      if (key === this.getCurrentDeviceToken()) {
+        this.flex.Actions.invokeAction("Logout", {
+          forceLogout: true,
+          activitySid: this.state.worker.activity.sid,
+        });
+      }
+
       this.manager.store.dispatch({
         type: REMOVE_DEVICE,
-        payload: item.item.descriptor.key,
-      })
+        payload: key,
+      });
     })
-    await this.devicesMap.set(this.getDeviceToken(), {})
+    await this.devicesMap.set(this.getCurrentDeviceToken(), {})
+  },
+
+  logoutDevice(deviceKey) {
+    this.devicesMap.remove(deviceKey);
   }
 }
 
@@ -97,7 +114,9 @@ const DeviceCounter = ({ devices }) => {
   return (
     <div>
       <button type="button" onClick={() => stuff.clearMap()}>clear</button>
-      {devices && !!devices.length && <>Devices {devices.map(dv => <span>{dv} !!! </span>)}</>}
+      {devices && !!devices.length && <>Devices {devices.map(dv => (
+        <button type="button" onClick={() => stuff.logoutDevice(dv)}>{dv} !!! </button>
+      ))}</>}
     </div>
   )
 }
