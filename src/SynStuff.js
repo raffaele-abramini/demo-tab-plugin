@@ -130,16 +130,18 @@ const reducer = (state = {}, action) => {
 
 const OuterBox = styled("div")`
   margin-left: auto;
+  margin-top: 2px;
 `
 const InnerBox = styled("div")`
   background: ${p => p.theme.colors.base2};
-  width: 200px;
+  width: 220px;
   color: ${p => p.theme.calculated.textColor};
-  padding: 12px 12px 4px;
-  margin-top: 10px;
+  padding: 12px 12px 8px;
+  margin-top: 9px;
   box-shadow: 0 1px 2px 0 rgba(0,0,0,0.2);
-  animation: opla 0.2s forwards;
-  @keyframes opla {
+  animation: fadn 0.15s forwards;
+
+  @keyframes fadn {
     from { opacity: 0; }
     to { opacity: 1; }
   }
@@ -152,44 +154,61 @@ const Title = styled("p")`
 
 const DeviceRow = styled("div")`
   display: flex;
-  padding: 4px 0;
-  
-  & + & {
-    margin-top: 4px;
-    border-top: 1px solid ${p => p.theme.colors.base2};
-  }
+  padding: 8px 0 4px; 
+  margin-top: 6px;
+  border-top: 1px solid ${p => p.theme.colors.base4};
 `
 const DeviceRowDetail = styled("div")`
   padding-right: 4px;
   margin-right: auto;
+  font-size: 11px;
 `
+
+const setBg  = (p) => {
+  const bg = p.theme.colors.notificationIconColorError;
+  return `linear-gradient(${bg}, ${bg})`;
+}
 
 const LogoutDeviceBtn = styled(IconButton)`
   flex-shrink: 0;
-  background: ${p => p.theme.colors.notificationIconColorError};
+  background-image: ${setBg};
   color: white;
+
+  svg {
+     width: 20px;
+     height: 20px;
+  }
 `
 
 
-const PopupContent = ({ devices }) => {
+const PopupContent = ({ devices, refs }) => {
+  const handleLogout = (deviceKey) => {
+    stuff.logoutDevice(deviceKey);
+    setTimeout(() => refs.modal.hide(), 1000);
+  }
+
   return (
     <InnerBox>
       {
         !devices || !Object.keys(devices).length
           ? (
-            <Title>No other devices logged in!&nbsp; 🎉</Title>
+            <Title>This is the only device you're logged in!&nbsp; 🎉</Title>
           )
           : <>
-              <Title>Other devices logged in:</Title>
-              {Object.keys(devices).map(dv => {
-                const { details, started } = devices[dv];
+              <Title>You're logged in other devices 🤔</Title>
+              {Object.keys(devices).map(deviceKey => {
+                const { details, started } = devices[deviceKey];
                 return (
-                  <DeviceRow key={dv}>
+                  <DeviceRow key={deviceKey}>
                     <DeviceRowDetail>
                       <p>{details.browser} | {details.os}</p>
                       <p>{started}</p>
                     </DeviceRowDetail>
-                    <LogoutDeviceBtn icon="Logout" onClick={() => stuff.logoutDevice(dv)} title="Logout device" />
+                    <LogoutDeviceBtn
+                      icon="Logout"
+                      onClick={() => handleLogout(deviceKey)}
+                      title="Logout device"
+                    />
                   </DeviceRow>
                 )
               })}
@@ -199,16 +218,24 @@ const PopupContent = ({ devices }) => {
   )
 };
 const DeviceCounter = ({ devices }) => {
+  const refs = {};
+
+  const setModalRef = (element) => {
+    refs.modal = element || refs.modal;
+  };
+
   return (
     <OuterBox>
       <ModalPopupWithEntryControl
         className="DevicesList"
         alignRight
+        autoClose
         entryControl={
-          <IconButton icon="Agents" />
+          <IconButton icon={!devices || !Object.keys(devices).length ? "Agents" : "AgentsBold"} />
         }
+        ref={setModalRef}
       >
-      <PopupContent devices={devices} />
+      <PopupContent devices={devices} refs={refs} />
       </ModalPopupWithEntryControl>
     </OuterBox>
   )
