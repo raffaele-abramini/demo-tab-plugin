@@ -5,7 +5,15 @@ import { connect } from 'react-redux'
 import { ModalPopupWithEntryControl, IconButton, styled } from '@twilio/flex-ui';
 import UAParser from 'ua-parser-js';
 
-const extractID = (item) => item.descriptor.key
+const formatDevicePayload = (acc, item) => {
+  const { descriptor } = item;
+  acc[descriptor.key] = {
+    key: descriptor.key,
+    ...descriptor.data
+  }
+
+  return acc;
+}
 const deviceTokenKEy = 'devideToke'
 
 export const stuff = {
@@ -50,26 +58,15 @@ export const stuff = {
     this.devicesMap = await this.client.map(`devices_${this.state.worker.worker.sid}`)
 
     const devicesMapItems = await this.devicesMap.getItems()
-    const devicesIds = devicesMapItems.items.map(extractID)
+    // const devicesIds = devicesMapItems.items.map(extractID)
 
     this.manager.store.dispatch({
       type: ADD_DEVICES,
-      payload: Object.keys(devicesIds).map(key => devicesIds[key]),
+      payload: devicesMapItems.items.reduce(formatDevicePayload, {}),
     })
 
-    this.devicesMap.on('itemAdded', (deviceItem) => {
-      this.manager.store.dispatch({
-        type: UPDATE_DEVICE,
-        payload: deviceItem.item.descriptor.key,
-      })
-    })
-
-    this.devicesMap.on('itemUpdated', (deviceItem) => {
-      this.manager.store.dispatch({
-        type: UPDATE_DEVICE,
-        payload: deviceItem.item.descriptor.key,
-      });
-    })
+    this.devicesMap.on('itemAdded', this.handleItemUpdated.bind(this))
+    this.devicesMap.on('itemUpdated', this.handleItemUpdated.bind(this))
 
     this.devicesMap.on('itemRemoved', ({ key }) => {
       if (key === this.getCurrentDeviceToken()) {
@@ -85,14 +82,31 @@ export const stuff = {
       });
     })
 
+    const { browser, os, device } = UAParser(navigator);
+
     await this.devicesMap.set(this.getCurrentDeviceToken(), {
       started: new Date().toLocaleString(),
-      details: UAParser(navigator)
+      details: {
+        browser: browser.name,
+        os: os.name,
+        device: device.model,
+      }
     })
   },
 
   logoutDevice(deviceKey) {
     this.devicesMap.remove(deviceKey);
+  },
+
+  handleItemUpdated(deviceItem) {
+    const { descriptor } = deviceItem.item;
+    this.manager.store.dispatch({
+      type: UPDATE_DEVICE,
+      payload: {
+        key: descriptor.key,
+        ...descriptor.data
+      },
+    });
   }
 }
 
@@ -100,14 +114,15 @@ const ADD_DEVICES = 'ADD_DEVICES_BM'
 const UPDATE_DEVICE = 'UPDATE_DEVICE_BM'
 const REMOVE_DEVICE = 'REMOVE_DEVICE_BM'
 
-const reducer = (state, action) => {
+const reducer = (state = {}, action) => {
   switch (action.type) {
     case ADD_DEVICES:
-      return [...action.payload]
+      return {...action.payload}
     case UPDATE_DEVICE:
-      return state.includes(action.payload) ? state : [...state, action.payload]
+      return state[action.payload.key] ? state : {...state, [action.payload.key]: action.payload}
     case REMOVE_DEVICE:
-      return state.filter(item => item !== action.payload)
+      const {[action.payload] : removedItem, ...rest} = state;
+      return rest;
     default:
       return state
   }
@@ -120,9 +135,9 @@ const InnerBox = styled("div")`
   background: ${p => p.theme.colors.base2};
   width: 200px;
   color: ${p => p.theme.calculated.textColor};
-  padding: 5px;
+  padding: 12px 12px 4px;
   margin-top: 10px;
-  box-shadow: 0 1px 2px 0px rgba(0,0,0,0.2);
+  box-shadow: 0 1px 2px 0 rgba(0,0,0,0.2);
   animation: opla 0.2s forwards;
   @keyframes opla {
     from { opacity: 0; }
@@ -131,11 +146,58 @@ const InnerBox = styled("div")`
 `
 const Title = styled("p")`
   font-weight: bold;
-  margin-bottom: 4px;
+  margin-bottom: 12px;
   margin-top: 0;
 `
 
+const DeviceRow = styled("div")`
+  display: flex;
+  padding: 4px 0;
+  
+  & + & {
+    margin-top: 4px;
+    border-top: 1px solid ${p => p.theme.colors.base2};
+  }
+`
+const DeviceRowDetail = styled("div")`
+  padding-right: 4px;
+  margin-right: auto;
+`
 
+const LogoutDeviceBtn = styled(IconButton)`
+  flex-shrink: 0;
+  background: ${p => p.theme.colors.notificationIconColorError};
+  color: white;
+`
+
+
+const PopupContent = ({ devices }) => {
+  return (
+    <InnerBox>
+      {
+        !devices || !Object.keys(devices).length
+          ? (
+            <Title>No other devices logged in!&nbsp; 🎉</Title>
+          )
+          : <>
+              <Title>Other devices logged in:</Title>
+              {Object.keys(devices).map(dv => {
+                const { details, started } = devices[dv];
+                return (
+                  <DeviceRow key={dv}>
+                    <DeviceRowDetail>
+                      <p>{details.browser} | {details.os}</p>
+                      <p>{started}</p>
+                    </DeviceRowDetail>
+                    <LogoutDeviceBtn icon="Logout" onClick={() => stuff.logoutDevice(dv)} title="Logout device" />
+                  </DeviceRow>
+                )
+              })}
+            </>
+      }
+    </InnerBox>
+  )
+};
 const DeviceCounter = ({ devices }) => {
   return (
     <OuterBox>
@@ -143,25 +205,19 @@ const DeviceCounter = ({ devices }) => {
         className="DevicesList"
         alignRight
         entryControl={
-          <IconButton icon="info" />
+          <IconButton icon="Agents" />
         }
       >
-      <InnerBox>
-        {devices && !!devices.length && <>
-          <Title>Devices</Title>
-          {devices.map(dv => (
-            <button type="button" onClick={() => stuff.logoutDevice(dv)}>{dv} !!! </button>
-          ))}
-        </>}
-      </InnerBox>
+      <PopupContent devices={devices} />
       </ModalPopupWithEntryControl>
     </OuterBox>
   )
 }
 
 const ConnectedDeviceCounter = connect((state) => {
+  const {[stuff.getCurrentDeviceToken()] : currentDevice, ...rest} = state.devices;
   return {
-    devices: state.devices,
+    devices: rest,
   }
 })(DeviceCounter)
 
